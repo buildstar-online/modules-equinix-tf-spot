@@ -1,0 +1,139 @@
+#cloud-config
+# The modules that run in the 'init' stage
+cloud_init_modules:
+- migrator
+- seed_random
+- bootcmd
+- write-files
+- growpart
+- resizefs
+- disk_setup
+- mounts
+- set_hostname
+- update_hostname
+- update_etc_hosts
+- ca-certs
+- rsyslog
+- users-groups
+- ssh
+
+# The modules that run in the 'config' stage
+cloud_config_modules:
+- snap
+- ssh-import-id
+- keyboard
+- locale
+- set-passwords
+- grub-dpkg
+- apt-pipelining
+- apt-configure
+# - ubuntu-advantage
+- ntp
+- timezone
+- disable-ec2-metadata
+- runcmd
+- byobu
+
+# The modules that run in the 'final' stage
+cloud_final_modules:
+- package-update-upgrade-install
+- fan
+- landscape
+- lxd
+- ubuntu-drivers
+- write-files-deferred
+- puppet
+- chef
+- mcollective
+- salt-minion
+- reset_rmc
+- refresh_rmc_and_interface
+- rightscale_userdata
+- scripts-vendor
+- scripts-per-once
+- scripts-per-boot
+- scripts-per-instance
+- scripts-user
+- ssh-authkey-fingerprints
+- keys-to-console
+- install-hotplug
+- phone-home
+- final-message
+- power-state-change
+groups:
+  - docker
+users:
+  - name: admin
+    groups: users, admin, sudo, docker
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    no_create_home: false
+    ssh_import_id:
+      - gh:<some-user-goes-here>
+    lock_passwd: false
+    passwd: <encrypted-password-goes-here>
+bootcmd:
+  - file -s /dev/nvme1n1
+  - mkfs -t xfs /dev/nvme1n1
+  - mkdir -p /prometheus
+  - mount /dev/nvme1n1 /prometheus
+write_files:
+  - path: /etc/systemd/system/node_exporter.service
+    content: |
+      [Unit]
+      Description=Prometheus Node Exporter
+      Documentation=https://github.com/prometheus/node_exporter
+      After=network-online.target
+
+      [Service]
+      User=root
+      EnvironmentFile=/etc/default/node_exporter
+      ExecStart=/opt/node_exporter/node_exporter $OPTIONS
+      Restart=on-failure
+      RestartSec=5
+
+      [Install]
+      WantedBy=multi-user.target
+  - path: /etc/default/node_exporter
+    content: |
+      OPTIONS=''
+  - path: /prometheus/prometheus.yml
+    content: |
+      global:
+        scrape_interval:     5s
+        evaluation_interval: 5s
+
+      rule_files:
+        # - "first.rules"
+        # - "second.rules"
+
+      scrape_configs:
+        - job_name: prometheus
+          static_configs:
+            - targets: ['localhost:9090']
+            - targets: ['VM_IP_GOES_HERE:9100']
+package_update: true
+package_upgrade: true
+packages:
+  - docker.io
+  - whois
+  - wget
+  - curl
+  - vim
+  - xterm
+  - xinit
+  - x11vnc
+  - xfce4
+  - xfce4-goodies
+runcmd:
+  - sed -i "s/VM_IP_GOES_HERE/$(curl icanhazip.com)/g" /prometheus/prometheus.yml
+  - wget -O /opt/node_exporter-1.4.0.linux-amd64.tar.gz https://github.com/prometheus/node_exporter/releases/download/v1.4.0/node_exporter-1.4.0.linux-amd64.tar.gz
+  - tar -xvf /opt/node_exporter-1.4.0.linux-amd64.tar.gz -C /opt
+  - rm /opt/node_exporter-1.4.0.linux-amd64.tar.gz
+  - rm /opt/node_exporter
+  - ln -s node_exporter-1.4.0.linux-amd64 /opt/node_exporter
+  - systemctl daemon-reload
+  - systemctl enable node_exporter
+  - systemctl restart node_exporter
+  - docker run -d -p 9090:9090 --mount source=prometheus,target=/prometheus -v /prometheus/prometheus.yml:/etc/prometheus/prometheus.yml prom/prometheus
+  - docker run -d --name=grafana -p 3000:3000 grafana/grafana-enterprise
