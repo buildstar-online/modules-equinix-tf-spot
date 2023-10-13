@@ -65,7 +65,11 @@ While your specific bidding strategy is entirely up to you, most users adopt one
     - Use Case: Accept some periods of higher-than-market prices in return for uptime continuity
     - Suggested Bid: 2x-3x on demand price
 
-## Prices in Amsterdam
+## Prices and Inventory in Amsterdam
+
+Machine Sizes: https://deploy.equinix.com/product/bare-metal/servers/
+
+Current spot prices:
 
 ```bash
 TOKEN=$(bw get notes equinix-api-token) && \
