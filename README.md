@@ -45,6 +45,77 @@ Once you have an account, you can create an API Key from your account settings p
         hashicorp/terraform:latest destroy -target equinix_metal_spot_market_request.req
     ```
 
+## Bidding Strategies
+
+While your specific bidding strategy is entirely up to you, most users adopt one of these bidding strategies based on their use case:
+
+1. Strictly Optimize Cost - Sacrifice availability for the deepest discount. This is great for long-running workloads that have flexible end dates.
+    - Use Case: Research-style tasks
+    - Suggested Bid: near minimum
+
+2. Cost/Availability Balance - Slightly higher price than strictly cost optimized, but allows you to increase the likelihood of getting and keeping an instance for longer periods of time.
+    - Use Case: Batch jobs that can handle some amount of reclamation
+    - Suggested Bid: 10-20% above minimum
+
+3. Bid On Demand Price - Receive a discount anytime the spot price is lower than on demand, immediately switching to on demand when it goes higher.
+    - Use Case: Fully cloud native applications capable of easily moving workloads around
+    - Suggested Bid: on demand price
+
+4. Optimize Continuity - Bid very high to ensure availability and continuity.
+    - Use Case: Accept some periods of higher-than-market prices in return for uptime continuity
+    - Suggested Bid: 2x-3x on demand price
+
+## Prices in Amsterdam
+
+```bash
+TOKEN=$(bw get notes equinix-api-token) && \
+URL="https://api.equinix.com/metal/v1/market/spot/prices/metros" && \
+METRO="am" && \
+PRICES=$(curl -X GET -H "X-Auth-Token: $TOKEN" $URL -d "metro=$METRO" | \
+python3 -c "import sys, json; print(json.load(sys.stdin)['spot_market_prices']['am'])"| sed "s/'/\"/g") && \
+echo $PRICES |jq
+```
+
+```json
+{
+  "a3.large.x86": {
+    "price": 0.75
+  },
+  "c2.medium.x86": {
+    "price": 2.01
+  },
+  "c3.medium.x86": {
+    "price": 2.21
+  },
+  "c3.small.x86": {
+    "price": 1.01
+  },
+  "m2.xlarge.x86": {
+    "price": 4.01
+  },
+  "m3.large.x86": {
+    "price": 0.68
+  },
+  "m3.small.x86": {
+    "price": 0.11
+  },
+  "n2.xlarge.x86": {
+    "price": 1.0
+  },
+  "n3.xlarge.x86": {
+    "price": 0.45
+  },
+  "s3.xlarge.x86": {
+    "price": 0.61
+  },
+  "t3.small.x86": {
+    "price": 0.71
+  },
+  "t3.xsmall.x86": {
+    "price": 0.71
+  }
+}
+```
 
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
